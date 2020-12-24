@@ -1,0 +1,915 @@
+---
+title: "SOSC 5500"
+output: html_document
+---
+library and set-up
+```{r}
+library(readr)
+library(dplyr)
+library(chinese.misc)
+library(stringr)
+library(tm)
+library(jiebaR)
+library(tidytext)
+library(ggplot2)
+library(tidyr)
+library(stringr)
+library(rebus)
+library(reshape2)
+library(plm)
+library(lmtest)
+library(sandwich)
+library(stargazer)
+library(ggpubr)
+library(rstatix)
+library("RColorBrewer")
+options(tmp_chi_locale="auto")
+```
+
+Format raw data file
+```{r}
+#Diba
+Diba<- readxl::read_xlsx("Diba_excel.xlsx")
+Diba$id<- as.numeric(Diba$id)
+Diba$id<- format(Diba$id, scientific=F)
+Diba$original_id<- format(Diba$original_id, scientific=F)
+Diba$original_post_id <- format(Diba$original_post_id, scientific=F)
+Diba$original_post_id <-as.numeric(Diba$original_post_id)
+Diba$date <- as.Date(Diba$date, "%Y-%m-%d")
+writexl::write_xlsx(Diba, "Diba_excel_formated.xlsx")
+#Fandom Girls
+Fandom<- readxl::read_xlsx("Fandom_girl_excel.xlsx")
+Fandom$id<- as.numeric(Fandom$id)
+Fandom$id<- format(Fandom$id, scientific=F)
+Fandom$original_id<- format(Fandom$original_id, scientific=F)
+Fandom$original_post_id <- format(Fandom$original_post_id, scientific=F)
+Fandom$original_post_id<- as.numeric(Fandom$original_post_id)
+Fandom$date <-as.Date(Fandom$date, "%Y-%m-%d")
+writexl::write_xlsx(Fandom, "Fandom_excel_formated.xlsx")
+#AZhong
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/AZhong_Group")
+AZhong<- readxl::read_xlsx("AZhong_full.xlsx")
+AZhong$id<- as.numeric(AZhong$id)
+AZhong$id<- format(AZhong$id, scientific=F)
+AZhong$original_id<- format(AZhong$original_id, scientific=F)
+AZhong$original_post_id <- format(AZhong$original_post_id, scientific=F)
+AZhong$original_post_id<- as.numeric(AZhong$original_post_id)
+AZhong$date <-as.Date(AZhong$date, "%Y-%m-%d")
+writexl::write_xlsx(AZhong, "AZhong_excel_formated.xlsx")
+#additional data from cookies
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/AZhong_Group/AZhong_FanHeiZhan")
+AZhong_additional <- read_delim("7281791597_beforeJune2020.csv", delim = ",")
+AZhong_additional<-AZhong_additional %>%
+  separate(date, into = c("date", "time"), sep = " ")
+AZhong_additional$date <- format(as.Date(AZhong_additional$date, format = "%m/%d/%Y"), "%Y-%m-%d")
+writexl::write_xlsx(AZhong_additional,"AZhong_additional_excel_formated.xlsx")
+#China Support Group
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/China Support Group")
+support<- readxl::read_excel("China_support_group.xlsx")
+support$id<- as.numeric(support$id)
+support$id<- format(support$id, scientific=F)
+support$original_id<- format(support$original_id, scientific=F)
+support$original_post_id <- format(support$original_post_id, scientific=F)
+support$original_post_id<- as.numeric(support$original_post_id)
+support$date <-as.Date(support$date, "%Y-%m-%d")
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo")
+writexl::write_xlsx(support, "China_support_group_excel_formated.xlsx")
+#additional data from cookies
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/China Support Group")
+support_additional <- read_delim("try.csv", delim = ",")
+writexl::write_xlsx(support_additional, "China_support_group_additional.xlsx")
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/China Support Group")
+support_additional <- readxl::read_xlsx("China_support_group_additional.xlsx")
+support_additional<-support_additional %>%
+  separate(date, into = c("date", "time"), sep = " ")
+support_additional$date <- format(as.Date(support_additional$date, format = "%m/%d/%Y"), "%Y-%m-%d")
+writexl::write_xlsx(support_additional,"China_support_group_additional_excel_formated.xlsx")
+```
+
+```{r}
+#AZhong
+AZhong_2019 <- subset(AZhong, AZhong$date < "2020-01-01")
+AZhong_2020<- subset(AZhong, AZhong$date>= "2020-01-01")
+writexl::write_xlsx(AZhong_2019, "AZhong_formated_2019.xlsx")
+writexl::write_xlsx(AZhong_2020, "AZhong_formated_2020.xlsx")
+#AZhong_additional
+AZhong_additional_2019 <- subset(AZhong_additional, AZhong_additional$date < "2020-01-01")
+AZhong_additional_2020 <- subset(AZhong_additional, AZhong_additional$date >= "2020-01-01")
+writexl::write_xlsx(AZhong_additional_2019, "AZhong_additional_formated_2019.xlsx")
+writexl::write_xlsx(AZhong_additional_2020, "AZhong_additional_formated_2020.xlsx")
+#AZhong and additional combined content 
+AZhong_content_2019<- as.data.frame(append(AZhong_2019$content, AZhong_additional_2019$content))
+names(AZhong_content_2019) <- c("content")
+AZhong_content_2020<- as.data.frame(append(AZhong_2020$content, AZhong_additional_2020$content))
+names(AZhong_content_2020) <- c("content")
+writexl::write_xlsx(AZhong_content_2019, "AZhong_content_2019.xlsx")
+writexl::write_xlsx(AZhong_content_2020, "AZhong_content_2020.xlsx")
+#China_support_group
+support_2019 <- subset(support, support$date < "2020-01-01")
+support_2020<- subset(support, support$date>= "2020-01-01")
+writexl::write_xlsx(support_2019, "China_support_group_formated_2019.xlsx")
+writexl::write_xlsx(support_2020, "China_support_group_formated_2020.xlsx")
+#AZhong_additional
+support_additional_2019 <- subset(support_additional, support_additional$date < "2020-01-01")
+support_additional_2020 <- subset(support_additional, support_additional$date >= "2020-01-01")
+writexl::write_xlsx(support_additional_2019, "China_support_group_additional_formated_2019.xlsx")
+writexl::write_xlsx(support_additional_2020, "China_support_group_additional_formated_2020.xlsx")
+#AZhong and additional combined content 
+support_content_2019<- as.data.frame(append(support_2019$content, support_additional_2019$content))
+names(support_content_2019) <- c("content")
+support_content_2020<- as.data.frame(append(support_2020$content, support_additional_2020$content))
+names(support_content_2020) <- c("content")
+writexl::write_xlsx(support_content_2019, "China_support_group_content_2019.xlsx")
+writexl::write_xlsx(support_content_2020, "China_support_group_content_2020.xlsx")
+```
+
+read formatted and clean files
+```{r}
+Fandom <- readxl::read_xlsx("Fandom_excel_formated.xlsx")
+Diba<- readxl::read_xlsx("Diba_excel_formated.xlsx")
+Support<- readxl::read_xlsx("China_support_group_full_excel_formated.xlsx")
+Azhong<- readxl::read_xlsx("Azhong_full_excel_formated.xlsx")
+Fandom_vect<- rbind(Fandom, Support, Azhong)
+
+```
+
+Segmentation done in Python using PKU segmentation
+then read to R to do the counting 
+```{r}
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/Top_words")
+Diba_2019_word <-readLines("Diba_2019_word.txt", encoding = "UTF-8")
+Diba_2019_word<- as.data.frame(Diba_2019_word)
+names(Diba_2019_word) <- c("word")
+Diba_2019_word_removed<- Diba_2019_word %>%
+  count(word)%>%
+  arrange(desc(n))
+writexl::write_xlsx(Diba_2019_word_removed[1:100,], "Diba_2019_top100word.xlsx")
+#Diba 2020
+Diba_2020_word <-readLines("Diba_2020_word.txt", encoding = "UTF-8")
+Diba_2020_word<- as.data.frame(Diba_2020_word)
+names(Diba_2020_word) <- c("word")
+Diba_2020_word_removed<- Diba_2020_word %>%
+  count(word)%>%
+  arrange(desc(n))
+writexl::write_xlsx(Diba_2020_word_removed[1:100,], "Diba_2020_top100word.xlsx")
+#Fandom 2019
+Fandom_2019_word <-readLines("Fandom_2019_word.txt", encoding = "UTF-8")
+Fandom_2019_word<- as.data.frame(Fandom_2019_word)
+names(Fandom_2019_word) <- c("word")
+Fandom_2019_word_removed<- Fandom_2019_word %>%
+  count(word)%>%
+  arrange(desc(n))
+writexl::write_xlsx(Fandom_2019_word_removed[1:100,], "Fandom_2019_top100word.xlsx")
+#Fandom 2020
+Fandom_2020_word <-readLines("Fandom_2020_word.txt", encoding = "UTF-8")
+Fandom_2020_word<- as.data.frame(Fandom_2020_word)
+names(Fandom_2020_word) <- c("word")
+Fandom_2020_word_removed<- Fandom_2020_word %>%
+  count(word)%>%
+  arrange(desc(n))
+writexl::write_xlsx(Fandom_2020_word_removed[1:100,], "Fandom_2020_top100word.xlsx")
+#Azhong 2019
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/Top_words")
+AZhong_2019_word <-readLines("AZhong_2019_word.txt", encoding = "UTF-8")
+AZhong_2019_word<- as.data.frame(AZhong_2019_word)
+names(AZhong_2019_word) <- c("word")
+AZhong_2019_word_removed<- AZhong_2019_word %>%
+  count(word)%>%
+  arrange(desc(n))
+writexl::write_xlsx(AZhong_2019_word_removed[1:100,], "AZhong_2019_top100word.xlsx")
+#Azhong 2020
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/Top_words")
+AZhong_2020_word <-readLines("AZhong_2020_word.txt", encoding = "UTF-8")
+AZhong_2020_word<- as.data.frame(AZhong_2020_word)
+names(AZhong_2020_word) <- c("word")
+AZhong_2020_word_removed<- AZhong_2020_word %>%
+  count(word)%>%
+  arrange(desc(n))
+writexl::write_xlsx(AZhong_2020_word_removed[1:100,], "AZhong_2020_top100word.xlsx")
+#support 2019
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/Top_words")
+support_2019_word <-readLines("China_support_group_2019_word.txt", encoding = "UTF-8")
+support_2019_word<- as.data.frame(support_2019_word)
+names(support_2019_word) <- c("word")
+support_2019_word_removed<- support_2019_word %>%
+  count(word)%>%
+  arrange(desc(n))
+writexl::write_xlsx(support_2019_word_removed[1:100,], "China_support_group_2019_top100word.xlsx")
+#support 2020
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/Top_words")
+support_2020_word <-readLines("China_support_group_2020_word.txt", encoding = "UTF-8")
+support_2020_word<- as.data.frame(support_2020_word)
+names(support_2020_word) <- c("word")
+support_2020_word_removed<- support_2020_word %>%
+  count(word)%>%
+  arrange(desc(n))
+writexl::write_xlsx(support_2020_word_removed[1:100,], "China_support_group_2020_top100word.xlsx")
+
+```
+
+segmentation done in python using PKU segmentation
+read to R to do tfidf 
+```{r}
+#Diba 
+Diba_full<- readxl::read_xlsx("Diba_full_id.xlsx")
+Diba_full$id<- as.numeric(Diba_full$id)
+Diba_full$id<- format(Diba_full$id, scientific=F)
+Diba_full<- separate_rows(Diba_full,content, sep= ",")
+Diba_full$content<- str_remove_all(Diba_full$content, "[^[:alnum:].]+")
+Diba_full_count<- data.frame(Diba_full$id, Diba_full$content)
+names(Diba_full_count) <- c("id", "content")
+Diba_full_tfidf <- Diba_full_count %>%
+  count(id, content) %>%
+  bind_tf_idf(content, id, n)%>%
+  arrange(desc(tf_idf))
+writexl::write_xlsx(Diba_full_tfidf,"Diba_full_tfidf.xlsx")
+#Fandom
+Fandom_full<- readxl::read_xlsx("Fandom_full_id.xlsx")
+Fandom_full$id<- as.numeric(Fandom_full$id)
+Fandom_full$id<- format(Fandom_full$id, scientific=F)
+Fandom_full<- separate_rows(Fandom_full,content, sep= ",")
+Fandom_full$content<- str_remove_all(Fandom_full$content, "[^[:alnum:].]+")
+Fandom_full_count<- data.frame(Fandom_full$id, Fandom_full$content)
+names(Fandom_full_count) <- c("id", "content")
+Fandom_full_tfidf <- Fandom_full_count %>%
+  count(id, content) %>%
+  bind_tf_idf(content, id, n)%>%
+  arrange(desc(tf_idf))
+writexl::write_xlsx(Fandom_full_tfidf, "Fandom_full_tfidf.xlsx")
+#Azhong
+Azhong_full<- readxl::read_xlsx("Azhong_id.xlsx")
+Azhong_full$id<- as.numeric(Azhong_full$id)
+Azhong_full$id<- format(Azhong_full$id, scientific=F)
+Azhong_full<- separate_rows(Azhong_full,content, sep= ",")
+Azhong_full$content<- str_remove_all(Azhong_full$content, "[^[:alnum:].]+")
+Azhong_full_count<- data.frame(Azhong_full$id, Azhong_full$content)
+names(Azhong_full_count) <- c("id", "content")
+Azhong_full_tfidf <- Azhong_full_count %>%
+  count(id, content) %>%
+  bind_tf_idf(content, id, n)%>%
+  arrange(desc(tf_idf))
+writexl::write_xlsx(Azhong_full_tfidf, "Azhong_tfidf.xlsx")
+
+Azhong_additional<- readxl::read_xlsx("Azhong_additional_id.xlsx")
+Azhong_additional$id<- format(Azhong_additional$id, scientific=F)
+
+Azhong_additional<- separate_rows(Azhong_additional,content, sep= ",")
+Azhong_additional$content<- str_remove_all(Azhong_additional$content, "[^[:alnum:].]+")
+Azhong_additional_count<- data.frame(Azhong_additional$id, Azhong_additional$content)
+names(Azhong_additional_count) <- c("id", "content")
+Azhong_additional_tfidf <- Azhong_additional_count %>%
+  count(id, content) %>%
+  bind_tf_idf(content, id, n)%>%
+  arrange(desc(tf_idf))
+writexl::write_xlsx(Azhong_additional_tfidf, "Azhong_additional_tfidf.xlsx")
+
+#Support
+support_full<- readxl::read_xlsx("China_support_group_id.xlsx")
+support_full$id<- as.numeric(support_full$id)
+support_full$id<- format(support_full$id, scientific=F)
+support_full<- separate_rows(support_full,content, sep= ",")
+support_full$content<- str_remove_all(support_full$content, "[^[:alnum:].]+")
+support_full_count<- data.frame(support_full$id, support_full$content)
+names(support_full_count) <- c("id", "content")
+support_full_tfidf <- support_full_count %>%
+  count(id, content) %>%
+  bind_tf_idf(content, id, n)%>%
+  arrange(desc(tf_idf))
+writexl::write_xlsx(support_full_tfidf, "China_support_group_tfidf.xlsx")
+
+support_additional<- readxl::read_xlsx("China_support_group_additional_id.xlsx")
+support_additional$id<- format(support_additional$id, scientific=F)
+support_additional<- separate_rows(support_additional,content, sep= ",")
+support_additional$content<- str_remove_all(support_additional$content, "[^[:alnum:].]+")
+support_additional_count<- data.frame(support_additional$id, support_additional$content)
+names(support_additional_count) <- c("id", "content")
+support_additional_tfidf <- support_additional_count %>%
+  count(id, content) %>%
+  bind_tf_idf(content, id, n)%>%
+  arrange(desc(tf_idf))
+writexl::write_xlsx(support_additional_tfidf, "China_support_group_additional_tfidf.xlsx")
+
+
+
+```
+
+Emoji list
+```{r}
+library(remoji)
+emj <- emoji(list_emoji(), TRUE)
+```
+
+Dictionary 
+```{r}
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/Top_words")
+fandom_dictionary <- read.table("fandom dictionary_new.txt")
+pat_dictionary <- readLines("patriarchal dictionary_new.txt")
+fandom_dictionary_new<- append(fandom_dictionary, emj)
+write.table(fandom_dictionary_new,"fandom dictionary_2.txt" , row.names = FALSE, col.names = FALSE, quote = FALSE)
+write.table(pat_dictionary, "patriarchal dictionary_2.txt", row.names = FALSE, col.names = FALSE, quote = FALSE)
+fandom_dictionary<- readLines("fandom dictionary_2.txt")
+pat_dictionary<- pat_dictionary <- readLines("patriarchal dictionary_2.txt")
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/Top_words")
+fandom_dictionary<- readxl::read_xlsx("fandom dictionary_2.xlsx")
+pat_dictionary<- readxl::read_xlsx("patriarchal dictionary_2.xlsx")
+fandom_dictionary<- rbind(fandom_dictionary,emi_df)
+
+```
+
+Extract hashtag
+```{r}
+myFunc <- function(x) unlist(strsplit(unlist(x), ", | |,"))
+hashtag_pattern<- "#" %R% one_or_more(WRD)%R% "#"
+#hashtag_pattern <- c("#\\S+"%R% "#")
+#Azhong
+Azhong_na<- Azhong %>%
+  drop_na(content)
+Azhong_hashtag_list <- c()
+id<- c()
+
+for (i in 1:nrow(Azhong_na)){
+  if(str_detect(Azhong_na$content[i],hashtag_pattern) == TRUE){
+  Azhong_hashtag_list <- append(Azhong_hashtag_list,str_extract_all(Azhong_na$content[i], hashtag_pattern) )
+  id<- append(id, Azhong_na$id[i])
+  }
+}
+#assign the id back to the list name 
+names(Azhong_hashtag_list) <- id
+#count the most frequent hashtag 
+Azhong_hashtag_df<- data.frame(Col1 = rep(id, sapply(Azhong_hashtag_list, function(x) length(myFunc(x)))), Col2 = myFunc(Azhong_hashtag_list))
+Azhong_hashtag_count <- Azhong_hashtag_df %>%
+  count(Col2) %>%
+  arrange(desc(n))
+#Support
+Support_old<- Support %>%
+  select(id, content)
+Support_new<- Support_additional %>%
+  select(id, content)
+Support_combine <- rbind(Support_old, Support_new)
+Support_na<- Support_combine %>%
+  drop_na(content)
+Support_hashtag_list <- c()
+id<- c()
+for (i in 1:nrow(Support_na)){
+  if(str_detect(Support_na$content[i],hashtag_pattern) == TRUE){
+  Support_hashtag_list <- append(Support_hashtag_list,str_extract_all(Support_na$content[i], hashtag_pattern) )
+  id<- append(id, Support_na$id[i])
+  }
+}
+#assign the id back to the list name 
+names(Support_hashtag_list) <- id
+#count the most frequent hashtag 
+Support_hashtag_df<- data.frame(Col1 = rep(id, sapply(Support_hashtag_list, function(x) length(myFunc(x)))), Col2 = myFunc(Support_hashtag_list))
+Support_hashtag_count <- Support_hashtag_df %>%
+  count(Col2) %>%
+  arrange(desc(n))
+#Fandom
+Fandom_na<- Fandom %>%
+  drop_na(content)
+Fandom_hashtag_list <- c()
+id<- c()
+
+for (i in 1:nrow(Fandom_na)){
+  if(str_detect(Fandom_na$content[i],hashtag_pattern) == TRUE){
+  Fandom_hashtag_list <- append(Fandom_hashtag_list,str_extract_all(Fandom_na$content[i], hashtag_pattern) )
+  id<- append(id, Fandom_na$id[i])
+  }
+}
+#assign the id back to the list name 
+names(Fandom_hashtag_list) <- id
+#count the most frequent hashtag 
+Fandom_hashtag_df<- data.frame(Col1 = rep(id, sapply(Fandom_hashtag_list, function(x) length(myFunc(x)))), Col2 = myFunc(Fandom_hashtag_list))
+Fandom_hashtag_count <- Fandom_hashtag_df %>%
+  count(Col2) %>%
+  arrange(desc(n))
+
+
+```
+
+remove hashtag 
+```{r}
+hashtag_pattern<- "#" %R% one_or_more(WRD)%R% "#"
+#Diba
+for (index in 1:nrow(Diba)){
+    Diba$content[index] = str_remove_all(Diba$content[index], hashtag_pattern)
+  }
+writexl::write_xlsx(Diba, "Diba_full_hashtag_removed.xlsx")
+#Fandom
+for (index in 1:nrow(Fandom)){
+    Fandom$content[index] = str_remove_all(Fandom$content[index], hashtag_pattern)
+  }
+writexl::write_xlsx(Fandom, "Fandom_full_hashtag_removed.xlsx")
+#Azhong 
+for (index in 1:nrow(Azhong)){
+    Azhong$content[index] = str_remove_all(Azhong$content[index], hashtag_pattern)
+  }
+writexl::write_xlsx(Azhong, "Azhong_full_hashtag_removed.xlsx")
+#Support
+for (index in 1:nrow(Support)){
+    Support$content[index] = str_remove_all(Support$content[index], hashtag_pattern)
+  }
+writexl::write_xlsx(Support, "China_support_group_full_hashtag_removed.xlsx")
+
+```
+
+extracting original post information from additional 
+```{r}
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo")
+Support_additional <- readxl::read_xlsx("China_support_group_additional-unique_excel_formated.xlsx")
+Azhong_additional<- readxl::read_xlsx("Azhong_additional_unique_excel_formated.xlsx")
+content_patterm <- "转发理由:"
+original_account_pattern<- "原始用户:"
+original_content<- "转发内容:"
+#AZhong_additional
+Azhong_additional<- Azhong_additional %>%
+  separate(content, into = c('content', 'original_account'), sep = original_account_pattern, fill = "right") %>%
+  separate(original_account, into = c('original_account', 'original_content'), sep = original_content, fill = "right") 
+Azhong_additional$content<- str_remove(Azhong_additional$content, content_patterm)
+writexl::write_xlsx(Azhong_additional, "Azhong_additional_recovered.xlsx")
+#Support
+Support_additional<- Support_additional %>%
+  separate(content, into = c('content', 'original_account'), sep = original_account_pattern, fill = "right") %>%
+  separate(original_account, into = c('original_account', 'original_content'), sep = original_content, fill = "right") 
+Support_additional$content<- str_remove(Support_additional$content, content_patterm)
+writexl::write_xlsx(Support_additional, "China_support_group_additional_recovered.xlsx")
+```
+
+ploting graph-full data: top 20 words
+```{r}
+setwd("C:/Users/alani/Desktop/SOSC 5500/Weibo/Top_words")
+Diba_2019<- readxl::read_xlsx("Diba_2019_top100word.xlsx")
+Fandom_2019<-readxl::read_xlsx("Fandom_2019_top100word.xlsx") 
+Azhong_2019<- readxl::read_xlsx("Azhong_2019_top100word.xlsx")
+support_2019<- readxl::read_xlsx("China_support_group_2019_top100word.xlsx")
+#plot Diba
+Diba_2019_top_20<-Diba_2019[1:20,]
+#create factor variable to sort by frequency
+ggplot(Diba_2019_top_20, aes(x=reorder(word, -n), y=n, fill=word))+
+  geom_bar(stat="identity")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ylab("Top 20 word in Diba's Weibo 2019")+
+  xlab("")+
+  guides(fill=FALSE)
+#plot Fandom
+Fandom_2019_top_20<-Fandom_2019[1:20,]
+#create factor variable to sort by frequency
+ggplot(Fandom_2019_top_20, aes(x=reorder(word, -n), y=n, fill=word))+
+  geom_bar(stat="identity")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ylab("Top 20 word in Fandom Girls' Weibo 2019")+
+  xlab("")+
+  guides(fill=FALSE)
+#plot Azhong
+Azhong_2019_top_20<-Azhong_2019[1:20,]
+#create factor variable to sort by frequency
+ggplot(Azhong_2019_top_20, aes(x=reorder(word, -n), y=n, fill=word))+
+  geom_bar(stat="identity")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ylab("Top 20 word in AZhong's Weibo 2019")+
+  xlab("")+
+  guides(fill=FALSE)
+#plot support
+support_2019_top_20<-support_2019[1:20,]
+#create factor variable to sort by frequency
+ggplot(support_2019_top_20, aes(x=reorder(word, -n), y=n, fill=word))+
+  geom_bar(stat="identity")+
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+  ylab("Top 20 word in CSP's Weibo 2019")+
+  xlab("")+
+  guides(fill=FALSE)
+
+```
+
+read file with dictionary score
+```{r}
+#using hashtag removed and full file with score for each post 
+Diba<- readxl::read_xlsx("Diba_full_individual_score.xlsx")
+Fandom <- readxl::read_xlsx("Fandom_full_individual_score.xlsx")
+Azhong<- readxl::read_xlsx("Azhong_full_individual_score.xlsx")
+Support<- readxl::read_xlsx("China_support_group_full_individual_score.xlsx")
+Diba$sum_score <- Diba$pat_score + Diba$fan_score
+Fandom$sum_score <- Fandom$pat_score + Fandom$fan_score
+Azhong$sum_score <- Azhong$pat_score + Azhong$fan_score
+Support$sum_score <- Support$pat_score + Support$fan_score
+#combine them 
+Combined <- rbind(Diba, Fandom)
+Combined<- rbind(Combined, Azhong)
+Combined<- rbind(Combined, Support)
+Combined$new_category<- ifelse(Combined$category == "Diba", "Patriarchy", "Fandom")
+for (n in 1:nrow(Combined)){
+  if (Combined$category[n] == "Support"){
+    Combined$category[n] <- "ChinaSup"
+  } else if (Combined$category[n] == "Fandom"){
+    Combined$category[n]<- "Fangirls"
+  }
+}
+Combined$sum_score <- Combined$pat_score + Combined$fan_score
+combined_10<- subset(Combined, Combined$length >= 10)
+writexl::write_xlsx(Combined, "Combined__full_individual_score.xlsx")
+
+
+
+```
+
+Data part plot section
+```{r}
+#How 
+#fan score by each account
+ggplot(Combined, aes(x = category, y = (fan_score), colour = category))+
+  geom_boxplot()+ 
+  ggtitle("Fandom Score for Four Accounts") + 
+  labs(y = "score", x = "accounts") 
+#pat score
+ggplot(Combined, aes(x = category, y = pat_score, colour = category)) + 
+  geom_boxplot()+
+  ggtitle("Patriarchal Score for Four Accounts") + 
+  labs(y = "score", x = "accounts") 
+#total score(f-p)
+ggplot(Combined, aes(x = category, y = (fan_score-pat_score), colour = category)) + 
+  geom_boxplot()+
+  ggtitle("Total Score for Four Accounts (F-P)") + 
+  labs(y = "score", x = "accounts") 
+#plot the above in the one graph 
+combined_10<- subset(Combined, Combined$length >= 10)
+try <- melt(combined_10, id.vars =  c("category"), measure.vars = c("fan_score", "pat_score", "dict_score"))
+ggplot(try, aes(x = variable, y = value, fill = category))+
+  geom_boxplot() + 
+  labs( y = "Score (normlized by length)", x = "Dictionary")+ 
+  scale_x_discrete(labels=c("Fandom (F)", "Patriarchy(P)", "Difference (F - P)"))+ 
+  scale_fill_discrete(name = "Account", labels = c("Azhong", "ChinaSup", "Diba", "Fangirls")) 
+
+#pat vs fan
+ggplot(Combined, aes(x = fan_score, y = pat_score, colour = category)) + 
+  geom_point( position = position_jitter(width = 0.1), alpha = 0.2)+
+  ggtitle("Fandom Score vs Patriarchal Score for Four Accounts") 
+
+ggplot(Combined, aes(x = fan_score, fill = category)) + 
+  geom_density(alpha = 0.5)
+
+#bar chart FIg 4
+colour_chart <- c("#FF99FF", "#FF9966", "#33CCFF", "#CCC0FF")
+mean_summary <- data.frame(category = c("Azhong", "ChinaSup", "Diba" ,"Fangirls"),
+                           fan_score = c(mean(Azhong$fan_score), mean(Support$fan_score), mean(Diba$fan_score), mean(Fandom$fan_score)),
+                           pat_score = c(mean(Azhong$pat_score), mean(Support$pat_score), mean(Diba$pat_score), mean(Fandom$pat_score)),
+                           dict_score = c(mean(Azhong$dict_score), mean(Support$dict_score), mean(Diba$dict_score), mean(Fandom$dict_score)),
+                           sum_score = c(mean(Azhong$sum_score), mean(Support$sum_score), mean(Diba$sum_score), mean(Fandom$sum_score)))
+
+melt<- melt(mean_summary,id.vars =  c("category"), measure.vars = c("fan_score", "pat_score", "dict_score", "sum_score") )
+
+ggplot(melt, aes(y = value, x  = variable, fill = reorder(category, -value))) +
+  geom_col(position = position_dodge()) +
+  geom_text(aes(label=signif(value,2)),position = position_dodge(0.9), size=3)+
+  scale_x_discrete(labels=c("Idolization (I)", "Hegemony (H)", "Difference (I - H)", "Sum (I + H)"))+ 
+  labs( y = "Mean (normlized by length)", x = "Dictionary", fill = "Account")+ 
+  scale_fill_manual(values = c("Diba" = "#33CCFF",
+                               "Fangirls" = "#CC99FF",
+                               "ChinaSup" = "#FF9966",
+                               "Azhong" = "#FF99FF")) 
+ 
+  
+
+
+```
+
+H1 graphs
+```{r}
+#fan_score vs pat_score (four accounts graph) Fig 2
+ggplot(combined_10, aes(x = fan_score, y = pat_score))+
+  geom_point(position = position_jitter(width = 0.1), alpha  = 0.5 , aes(colour = new_category))+
+  facet_wrap(~category, labeller = as_labeller(list("Azhong" = "Azhong", "Diba"= "Diba", "Fandom" = "Fangirls","Support" = "ChinaSup"))) +
+  labs( y = "Hegemony Score (normlized by length)", x = "Idolization Score (normalized by length)", colour = "Camp") +
+  geom_hline(yintercept=0.1, linetype="dashed", 
+                color = "black") +
+   scale_color_manual(labels = c("Idolization", "Hegemony"), values = c("Patriarchy" = "#33CCFF","Fandom" = 
+                               "#FF99FF"))
+  
+
+#fan_score vs pat_score (two representative graph) Fig 3
+ggplot(combined_10, aes(x = fan_score, y = pat_score, colour = new_category))+ 
+  geom_point(position = position_jitter(width = 0.1), alpha = 0.5) + 
+  labs( y = "Patriarchy Score (normlized by length)", x = "Fandom Score (normalized by length)")+ 
+  scale_colour_discrete(name = "Representatives", labels = c("Azhong, ChinaSup, Fangirls", "Diba"), position = "bottom") + 
+  theme(legend.position = "bottom") + 
+  facet_wrap(~new_category) + 
+  geom_hline(yintercept=0.08, linetype="dashed", 
+                color = "black")
+  
+
+
+```
+
+retweet comparison
+```{r}
+Combined_retweet<- readxl::read_excel("Combined_for_retweet.xlsx")
+#preparation
+Patriarchy_retweet<- subset(Combined_retweet, ((Combined_retweet$original == FALSE) & (Combined_retweet$new_category == "Patriarchy")))
+Patriarchy_retweet<- subset(Patriarchy_retweet,
+     ((Patriarchy_retweet$original_account != "帝吧官微")|
+     (Patriarchy_retweet$original_account != "帝吧网友M")|
+     (Patriarchy_retweet$original_account != "帝吧联长")|
+    (Patriarchy_retweet$original_account != "帝吧资讯")|
+     (Patriarchy_retweet$original_account != "帝吧管理员")|
+     (Patriarchy_retweet$original_account != "帝吧震惊部")|
+     (Patriarchy_retweet$original_account != "帝吧爆破组")))
+Patriarchy_retweet$original_fan_score = Patriarchy_retweet$fan_count/Patriarchy_retweet$original_length
+Patriarchy_retweet$original_pat_score = Patriarchy_retweet$pat_count/Patriarchy_retweet$original_length
+Patriarchy_retweet$original_sum_score = 
+  (Patriarchy_retweet$pat_count + Patriarchy_retweet$fan_count)/Patriarchy_retweet$original_length
+Patriarchy_retweet$original_post_id = format(Patriarchy_retweet$original_post_id, scientific=F)
+Patriarchy_retweet$original_post_id = as.numeric(Patriarchy_retweet$original_post_id)
+writexl::write_xlsx(Patriarchy_retweet, "Patriarchy_retweet.xlsx")
+
+
+Fandom_retweet<-  subset(Combined_retweet, ((Combined_retweet$original == FALSE) & (Combined_retweet$new_category == "Fandom")))
+Fandom_retweet <- Fandom_retweet %>%
+  separate(original_account, into = c('original_account'), sep = "\r", 
+           extra = "drop")
+Fandom_retweet<- subset(Fandom_retweet, Fandom_retweet$original_account!= "China后援团")
+#饭圈女孩官微, 饭圈女孩网络出征, 饭圈女孩控评组, 饭圈女孩文宣组, 阿中哥哥反黑站, 阿中哥哥应援站, 阿中哥哥图文站, China后援团
+Fandom_retweet$original_fan_score = Fandom_retweet$fan_count/Fandom_retweet$original_length
+Fandom_retweet$original_pat_score = Fandom_retweet$pat_count/Fandom_retweet$original_length
+Fandom_retweet$original_sum_score = 
+  (Fandom_retweet$pat_count + Fandom_retweet$fan_count)/Fandom_retweet$original_length
+Fandom_retweet$original_post_id = format(Fandom_retweet$original_post_id, scientific=F)
+Fandom_retweet$original_post_id = as.numeric(Fandom_retweet$original_post_id)
+writexl::write_xlsx(Fandom_retweet, "Fandom_retweet.xlsx")
+
+#Common retweet : 76 retweets with same original post id 
+#Fandom: 235 tweets were retweeted by 8 accounts and resulted in 80 retweets
+Fandom_common_retweet <- semi_join(Fandom_retweet, Patriarchy_retweet, by = "original_post_id")
+unique(Fandom_common_retweet$original_post_id)
+
+
+
+#Patriarchy: 76 tweets were retweeted by 7 accounts and resulted in 99 retweets
+Patriarchy_common_retweet<- semi_join(Patriarchy_retweet, Fandom_retweet, by = "original_post_id")
+Patriarchy_common_retweet <- Patriarchy_common_retweet %>%
+  group_by(original_id)
+unique(Patriarchy_common_retweet$original_post_id)
+
+#Common retweet analysis
+Aggregate_Fandom<- Fandom_common_retweet %>%
+  group_by(original_post_id) %>%
+   summarise(fan_score= mean(fan_score),pat_score = mean(pat_score)) %>% 
+  mutate(category = "Fandom")
+
+Aggregate_Patriarchy<- Patriarchy_common_retweet %>%
+  group_by(original_post_id) %>%
+   summarise(fan_score= mean(fan_score), pat_score = mean(pat_score)) %>%
+  mutate(category = "Patriarchy")
+
+Aggregate_Control <- Patriarchy_common_retweet %>%
+  group_by(original_post_id) %>%
+  summarise(fan_score = mean(original_fan_score), pat_score = mean(original_pat_score)) %>%
+  mutate(category = "Third")
+#aggregate combined 
+Aggregate_combined  <- rbind(Aggregate_Fandom, Aggregate_Patriarchy)
+Aggregate_combined <- rbind(Aggregate_combined, Aggregate_Control)
+writexl::write_xlsx(Aggregate_combined, "Aggregated_combined.xlsx")
+
+#paired t-test 
+fan_score_ttest <- Aggregate_combined %>%
+  pairwise_t_test(fan_score ~ category, p.adjust.method = "bonferroni")
+pat_score_ttest <- Aggregate_combined %>%
+  pairwise_t_test(pat_score ~ category, p.adjust.method = "bonferroni")
+pat_score_ttest
+
+#Anova 
+Anova_fan <- Aggregate_combined %>% anova_test(fan_score ~ category)
+Anova_pat <- Aggregate_combined %>% anova_test(pat_score ~ category)
+
+#bar chart
+mean_summary <- data.frame(category = c("Fandom Camp", "Original Accounts", "Patriarchy Camp"),
+                           fan_score = c(mean(Fandom_common_retweet$fan_score), mean(Fandom_common_retweet$original_fan_score), mean(Patriarchy_common_retweet$fan_score)),
+                           pat_score = c(mean(Fandom_common_retweet$pat_score), mean(Fandom_common_retweet$original_pat_score), mean(Patriarchy_common_retweet$pat_score)),
+                           sum_score = c(mean(Fandom_common_retweet$sum_score), mean(Fandom_common_retweet$original_sum_score), mean(Patriarchy_common_retweet$sum_score)))
+
+melt<- melt(mean_summary,id.vars =  c("category"), measure.vars = c("fan_score", "pat_score", "sum_score") )
+
+ggplot(melt, aes(y = value, x  = variable, fill = category))+
+  geom_col(position=position_dodge()) +
+  geom_text(aes(label=signif(value,2)),position = position_dodge(0.9), size=3.5)+
+  scale_x_discrete(labels=c("Fandom (F)", "Patriarchy(P)", "Sum (F + P)"))+ 
+  labs( y = "Mean (normlized by length)", x = "Dictionary")
+#a lot of data without ID　——＞ not accurate 
+
+#all retweet 
+mean_summary <- data.frame(category = c("Fandom", "Original Accounts", "Patriarchy"),
+                           fan_score = c(mean(Fandom_retweet$fan_score), mean(Fandom_retweet$original_fan_score), mean(Patriarchy_retweet$fan_score)),
+                           pat_score = c(mean(Fandom_retweet$pat_score), mean(Fandom_retweet$original_pat_score), mean(Patriarchy_retweet$pat_score)),
+                           sum_score = c(mean(Fandom_retweet$sum_score), mean(Fandom_retweet$original_sum_score), mean(Patriarchy_retweet$sum_score)))
+
+melt<- melt(mean_summary,id.vars =  c("category"), measure.vars = c("fan_score", "pat_score", "sum_score") )
+
+ggplot(melt, aes(y = value, x  = variable, fill = category))+
+  geom_col(position=position_dodge()) +
+  geom_text(aes(label=signif(value,2)),position = position_dodge(0.9), size=3.5)+
+  scale_x_discrete(labels=c("Fandom (F)", "Patriarchy(P)", "Sum (F + P)"))+ 
+  labs( y = "Mean (normlized by length)", x = "Dictionary")
+
+
+```
+
+t-test retweet
+```{r}
+Fandom_ttest <- readxl::read_xlsx("Fandom_t-test.xlsx")
+Fandom_fan_score <- t.test(fan_score ~ category, data = Fandom_ttest,
+        var.equal = TRUE, alternative = "greater")
+Fandom_fan_score #good pvalue
+Fandom_pat_score <- t.test(pat_score ~ category, data = Fandom_ttest,
+        var.equal = TRUE, alternative = "greater")
+Fandom_pat_score #good pvalue
+
+Pat_ttest <- readxl::read_xlsx("Patriarchy_t-test.xlsx")
+Pat_fan_score <- t.test(fan_score ~category, data = Pat_ttest, 
+                        var.equal = TRUE, alternative = "greater")
+Pat_fan_score#good pvalue
+Pat_pat_score <- t.test(pat_score ~category, data = Pat_ttest, 
+                        var.equal = TRUE, alternative = "greater")
+Pat_pat_score
+
+#pairwise
+Combined_ttest <- rbind(Pat_ttest, Fandom_ttest)
+Combined_fan_score <- pairwise_t_test(data = Combined_ttest, fan_score ~ category, p.adjust.method = "bonferroni")
+Combined_fan_score
+Combined_pat_score <- pairwise_t_test(data = Combined_ttest, pat_score ~ category, p.adjust.method = "bonferroni")
+Combined_pat_score
+
+Fan_group<- subset(Combined_ttest, Combined_ttest$category== "Fandom")
+Pat_group <- subset(Combined_ttest, Combined_ttest$category == "Patriarchy")
+Third <- subset(Combined_ttest, Combined_ttest$category == "Third")
+mean(Third$pat_score)
+```
+
+Regression preparation 
+```{r}
+Combined <- readxl::read_xlsx("Combined_for_retweet.xlsx")
+Diba_only <- subset(Combined, Combined$new_category == "Patriarchy")
+Fandom_only <- subset(Combined, Combined$new_category == "Fandom")
+Third_party<- subset(Combined, Combined$original == FALSE)
+Third_party$original_fan_count <- as.numeric(Third_party$original_fan_count)
+Third_party$original_pat_count <- as.numeric(Third_party$original_pat_count)
+Third_party <- Third_party %>%
+  select(original_fan_count, original_pat_count, original_like_count, original_comment_count, original_retweet_count, length)
+colnames(Third_party) <- c("fan_count", "pat_count", "like_count", "comment_count", "retweet_count", "length")
+```
+
+regression
+```{r}
+#Retweet 
+#Fandom_plm
+Fandom_retweet_plm<- plm(retweet_count~fan_count*pat_count + length + like_count+ comment_count , index = "category", model = "within", data = Fandom_only)
+# Adjust standard errors
+retweet_cov1<- vcovHC(Fandom_retweet_plm, type = "HC1")
+
+retweet_robust_se    <- sqrt(diag(retweet_cov1))
+#Fandom_OLS
+Fandom_retweet_OLS<- lm(retweet_count~fan_count*pat_count + length + like_count+ comment_count, data = Fandom_only)
+
+OLS_retweet_cov1<- vcovHC(Fandom_retweet_OLS, type = "HC1")
+OLS_retweet_robust_se    <- sqrt(diag(OLS_retweet_cov1))
+#Diba_OLS
+Diba_retweet_OLS <- lm(retweet_count~fan_count*pat_count + length + like_count+ comment_count, data = Diba_only)
+Diba_retweet_cov1<- vcovHC(Diba_retweet_OLS, type = "HC1")
+Diba_retweet_robust_se    <- sqrt(diag(Diba_retweet_cov1))
+#Third Party OLS
+Third_retweet_OLS <- lm(retweet_count ~ fan_count*pat_count +length + like_count + comment_count, data = Third_party)
+Third_retweet_cov1<- vcovHC(Third_retweet_OLS, type = "HC1")
+Third_retweet_robust_se    <- sqrt(diag(Third_retweet_cov1))
+# Stargazer output (with and without RSE)
+stargazer(Fandom_retweet_plm, Fandom_retweet_OLS, Diba_retweet_OLS,Third_retweet_OLS, type = "text",
+          se = list(retweet_robust_se, OLS_retweet_robust_se , Diba_retweet_robust_se, Third_retweet_robust_se), 
+          column.labels = c("Fandom Camp", "Fandom Camp", "Patriarchy Camp", "Third Party"),
+          out = "retweet.html", notes = "phfhf")
+
+#Comment 
+#Fandom_plm
+Fandom_comment_plm<- plm(comment_count~fan_count*pat_count + length + like_count+ retweet_count , index = "category", model = "within", data = Fandom_only)
+# Adjust standard errors
+comment_cov1<- vcovHC(Fandom_comment_plm, type = "HC1")
+comment_robust_se    <- sqrt(diag(comment_cov1))
+#Fandom_OLS
+Fandom_comment_OLS<- lm(comment_count~fan_count*pat_count + length + like_count+ retweet_count, data = Fandom_only)
+OLS_comment_cov1<- vcovHC(Fandom_comment_OLS, type = "HC1")
+OLS_comment_robust_se    <- sqrt(diag(OLS_comment_cov1))
+#Diba_OLS
+Diba_comment_OLS <- lm(comment_count~fan_count*pat_count + length + like_count+ retweet_count, data = Diba_only)
+Diba_comment_cov1<- vcovHC(Diba_comment_OLS, type = "HC1")
+Diba_comment_robust_se    <- sqrt(diag(Diba_comment_cov1))
+#Third party
+Third_comment_OLS <- lm(comment_count ~ fan_count*pat_count +length + like_count + retweet_count, data = Third_party)
+Third_comment_cov1<- vcovHC(Third_comment_OLS, type = "HC1")
+Third_comment_robust_se    <- sqrt(diag(Third_comment_cov1))
+# Stargazer output (with and without RSE)
+stargazer(Fandom_comment_plm, Fandom_comment_OLS, Diba_comment_OLS,Third_comment_OLS , type = "text",
+          se = list(comment_robust_se, OLS_comment_robust_se, Diba_comment_robust_se  , Third_retweet_robust_se), 
+          column.labels = c("Fandom Camp", "Fandom Camp", "Patriarchy Camp", "Third Party"),
+          out = "comment.html")
+
+#Like 
+#Fandom_plm
+Fandom_like_plm<- plm(like_count~fan_count*pat_count + length + comment_count+ retweet_count , index = "category", model = "within", data = Fandom_only)
+# Adjust standard errors
+like_cov1<- vcovHC(Fandom_like_plm, type = "HC1")
+like_robust_se    <- sqrt(diag(like_cov1))
+#Fandom_OLS
+Fandom_like_OLS<- lm(like_count~fan_count*pat_count + length + comment_count+ retweet_count, data = Fandom_only)
+OLS_like_cov1<- vcovHC(Fandom_like_OLS, type = "HC1")
+OLS_robust_se    <- sqrt(diag(OLS_like_cov1))
+#Diba_OLS
+Diba_like_OLS <- lm(like_count~fan_count*pat_count + length + comment_count+ retweet_count, data = Diba_only)
+Diba_like_cov1<- vcovHC(Diba_like_OLS, type = "HC1")
+Diba_robust_se    <- sqrt(diag(Diba_like_cov1))
+#Third party
+Third_like_OLS <- lm(like_count ~ fan_count*pat_count +length + comment_count + retweet_count, data = Third_party)
+Third_like_cov1<- vcovHC(Third_like_OLS, type = "HC1")
+Third_like_robust_se    <- sqrt(diag(Third_like_cov1))
+# Stargazer output (with and without RSE)
+stargazer(Fandom_like_plm, Fandom_like_OLS, Diba_like_OLS, Third_like_OLS, type = "text",
+          se = list(like_robust_se, OLS_robust_se, Diba_robust_se, Third_like_robust_se ), 
+          column.labels = c("Fandom Camp", "Fandom Camp", "Patriarchy Camp", "Third Party"),
+          out = "like.html")
+
+
+```
+
+Facebook Expedition data
+```{r}
+Facebook <- read_delim("930 Expedition_score.csv", delim = ",")
+Facebook$message<- str_remove_all(Facebook$message, " ")
+length <- str_length(Facebook$message)
+Facebook$length <- length
+Facebook$fan_score = Facebook$fan_count/Facebook$length
+Facebook$pat_score = Facebook$pat_count/Facebook$length
+Facebook$sum_score = Facebook$sum_count/Facebook$length
+write_excel_csv(Facebook, "930 Expedition_new.csv")
+
+Facebook_2<- subset(Facebook, Facebook$level == 2 & Facebook$simplified == TRUE)
+
+Facebook_count <- separate_rows(Facebook, message, sep = " ")
+Facebook_count[ grep('[[:punct:] ]+', Facebook_count$message, invert = TRUE) , ]
+Facebook_count<- Facebook_count %>%
+  count(message)%>%
+  arrange(desc(n))
+
+#H2 
+Facebook_2$dict_pred <- ifelse(Facebook_2$fan_count > Facebook_2$pat_count, 1, 0)
+table(dict = Facebook_2$dict_pred, sup = Facebook_2$prediction)
+
+summary(Facebook_2$pat_count)
+mean(Facebook_2$pat_score)
+median(Facebook_2$pat_score)
+summary(Facebook_2$fan_count)
+mean(Facebook_2$fan_score)
+median(Facebook_2$fan_score)
+summary(Facebook_2$sum_count)
+mean(Facebook_2$sum_score)
+median(Facebook_2$sum_score)
+
+#Facebook Hegemony = 0
+Facebook_0<- subset(Facebook_2, Facebook_2$prediction== "0")
+summary(Facebook_0$fan_score)
+summary(Facebook_0$pat_score)
+Facebook_1 <- subset(Facebook_2, Facebook_2$prediction == "1")
+summary(Facebook_1$fan_score)
+summary(Facebook_1$pat_score)
+
+Facebook_Fat <- subset(Facebook_2, Facebook_2$fan_count>0)
+Facebook_Pat <- subset(Facebook_2, Facebook_2$pat_count >0)
+```
+
+```{r}
+Hege <- subset(Combined, Combined$new_category == "Patriarchy")
+Idol<- subset(Combined, Combined$new_category =="Fandom")
+summary(Combined$original_like_count)
+summary(Combined$original_comment_count)
+summary(Combined$original_retweet_count)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=TRUE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
